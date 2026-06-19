@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Spot Fragebogen Assistant",
+  "description": "Reviews Spot questionnaire text answers and suggests concise customer-ready wording.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Spot Assistant",
+    "default_popup": "popup/popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "options_page": "options/options.html",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
+  "host_permissions": [
+    "https://api.openai.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*",
+    "https://*/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://*/*",
+        "https://*/*"
+      ],
+      "js": [
+        "content/content.js"
+      ],
+      "css": [
+        "content/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

@@ -1,0 +1,266 @@
+#spot-ai-panel,
+.spot-ai-card,
+.spot-ai-toast {
+  color: #172033;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: 0;
+}
+
+#spot-ai-panel *,
+.spot-ai-card *,
+.spot-ai-toast * {
+  box-sizing: border-box;
+  letter-spacing: 0;
+}
+
+#spot-ai-panel {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 2147483646;
+  width: 256px;
+  padding: 12px;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 34px rgba(15, 23, 42, 0.12);
+}
+
+.spot-ai-panel-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.spot-ai-brand {
+  min-width: 0;
+}
+
+.spot-ai-title {
+  margin: 0;
+  color: #111827;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.25;
+}
+
+.spot-ai-subtitle {
+  margin: 2px 0 0;
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.spot-ai-actions {
+  display: grid;
+  grid-template-columns: 1fr 58px 70px;
+  gap: 6px;
+  align-items: center;
+}
+
+.spot-ai-button {
+  min-height: 28px;
+  border: 1px solid #ccd7e5;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #344054;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0 8px;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.spot-ai-button:hover {
+  border-color: #91a8c7;
+  background: #f7faff;
+  color: #1f4f99;
+}
+
+.spot-ai-button:focus,
+.spot-ai-suggestion-button:focus {
+  outline: none;
+}
+
+.spot-ai-button-primary {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.spot-ai-button-primary:hover {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+  color: #ffffff;
+}
+
+.spot-ai-status {
+  min-height: 16px;
+  margin-top: 9px;
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.spot-ai-card {
+  width: min(100%, 680px);
+  margin: 8px 0 0;
+  padding: 10px;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.spot-ai-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.spot-ai-question {
+  min-width: 0;
+  margin: 0;
+  color: #172033;
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.spot-ai-pill {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 2px 7px;
+  border: 1px solid #d8e0ea;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.spot-ai-pill-ok {
+  border-color: #b7e5c8;
+  background: #f3fbf6;
+  color: #087443;
+}
+
+.spot-ai-pill-warn {
+  border-color: #fed7aa;
+  background: #fffaf3;
+  color: #a15c07;
+}
+
+.spot-ai-section {
+  display: grid;
+  gap: 7px;
+  padding: 9px 0;
+  border-top: 1px solid #edf1f6;
+}
+
+.spot-ai-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: #475467;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.spot-ai-copy {
+  margin: 0;
+  color: #172033;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.spot-ai-muted {
+  color: #667085;
+}
+
+.spot-ai-suggestion {
+  display: grid;
+  gap: 8px;
+  padding: 9px;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #fbfcfe;
+}
+
+.spot-ai-suggestion-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.spot-ai-suggestion-button {
+  min-height: 28px;
+  border: 1px solid #2563eb;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+  padding: 0 9px;
+}
+
+.spot-ai-suggestion-button:hover {
+  border-color: #1d4ed8;
+  background: #1d4ed8;
+}
+
+.spot-ai-char-count {
+  color: #667085;
+  font-size: 10px;
+}
+
+.spot-ai-input-mark {
+  border-color: #7aa7f8 !important;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.12) !important;
+}
+
+.spot-ai-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 120px;
+  z-index: 2147483647;
+  max-width: 300px;
+  padding: 9px 11px;
+  border: 1px solid #d8e0ea;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #172033;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@media (max-width: 640px) {
+  #spot-ai-panel {
+    right: 10px;
+    bottom: 10px;
+    left: 10px;
+    width: auto;
+  }
+
+  .spot-ai-actions {
+    grid-template-columns: 1fr 58px 70px;
+  }
+}

@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="popup.css">
+    <title>Spot Assistant</title>
+  </head>
+  <body>
+    <main class="popup">
+      <header class="header">
+        <div>
+          <h1>Spot Textprüfung</h1>
+          <p id="status">Verbinde mit der aktuellen Seite...</p>
+        </div>
+      </header>
+
+      <section class="metric">
+        <span>Felder</span>
+        <strong id="fieldCount">-</strong>
+      </section>
+
+      <div class="actions">
+        <button id="run" class="button primary" type="button">Prüfen</button>
+        <button id="clear" class="button" type="button">Reset</button>
+        <button id="settings" class="button" type="button">Optionen</button>
+      </div>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="options.css">
+    <title>Spot Assistant Einstellungen</title>
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <h1>Spot Textprüfung</h1>
+          <p>OpenAI-Verbindung und Modell konfigurieren.</p>
+        </div>
+      </header>
+
+      <section class="panel">
+        <label class="label">API-Modus</label>
+        <div class="segmented" role="group" aria-label="API-Modus">
+          <label>
+            <input type="radio" name="mode" value="server">
+            <span>Server</span>
+          </label>
+          <label>
+            <input type="radio" name="mode" value="direct">
+            <span>Direkt</span>
+          </label>
+        </div>
+
+        <label class="label" for="serverUrl">Server URL</label>
+        <input id="serverUrl" class="input" type="url" placeholder="http://localhost:8787/v1/review">
+
+        <label class="label" for="model">Modell</label>
+        <input id="model" class="input" type="text" placeholder="gpt-5.4-nano">
+
+        <label class="label" for="apiKey">OpenAI API Key für Direktmodus</label>
+        <input id="apiKey" class="input" type="password" autocomplete="off" placeholder="sk-...">
+
+        <p class="note">Für die Firmeninstallation ist der Servermodus sauberer, weil der Key nicht auf jedem Arbeitsplatz gespeichert wird.</p>
+
+        <div class="actions">
+          <button id="save" class="button primary" type="button">Speichern</button>
+          <button id="test" class="button" type="button">Testen</button>
+        </div>
+        <p id="status" class="status">Bereit.</p>
+      </section>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
