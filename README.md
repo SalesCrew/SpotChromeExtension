@@ -26,7 +26,7 @@ Then load the extension:
 2. Enable Developer mode.
 3. Click Load unpacked.
 4. Select `C:\Users\kilia\OneDrive\Documents\Spot Extension\extension`.
-5. Open the extension options and keep the server URL as `http://localhost:8787/v1/review`, or replace it with your deployed server URL.
+5. Open the extension options and keep the server URL as `https://spotchromeextension-production.up.railway.app/v1/review`.
 
 ## Model Note
 
@@ -64,5 +64,5 @@ ALLOWED_ORIGIN=*
 Railway provides `PORT` automatically, and the root `npm start` command runs `server/server.js`. After deployment, generate a public Railway domain and put this in the extension options:
 
 ```text
-https://your-service.up.railway.app/v1/review
+https://spotchromeextension-production.up.railway.app/v1/review
 ```

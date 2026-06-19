@@ -2,7 +2,7 @@ export const DEFAULT_MODEL = "gpt-5.4-nano";
 
 export const DEFAULT_SETTINGS = {
   mode: "server",
-  serverUrl: "http://localhost:8787/v1/review",
+  serverUrl: "https://spotchromeextension-production.up.railway.app/v1/review",
   model: DEFAULT_MODEL,
   apiKey: ""
 };

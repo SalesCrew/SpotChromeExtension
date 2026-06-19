@@ -6,12 +6,15 @@ import {
 
 const SETTINGS_KEY = "spotAssistantSettings";
 const REQUEST_TIMEOUT_MS = 90000;
+const LEGACY_LOCAL_SERVER_URL = "http://localhost:8787/v1/review";
 
 chrome.runtime.onInstalled.addListener(async () => {
   const stored = await chrome.storage.local.get(SETTINGS_KEY);
   if (!stored[SETTINGS_KEY]) {
     await chrome.storage.local.set({ [SETTINGS_KEY]: DEFAULT_SETTINGS });
+    return;
   }
+  await chrome.storage.local.set({ [SETTINGS_KEY]: migrateSettings(stored[SETTINGS_KEY]) });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -118,10 +121,14 @@ async function testConnection() {
 
 async function getSettings() {
   const stored = await chrome.storage.local.get(SETTINGS_KEY);
-  return {
+  const settings = migrateSettings({
     ...DEFAULT_SETTINGS,
     ...(stored[SETTINGS_KEY] || {})
-  };
+  });
+  if (JSON.stringify(settings) !== JSON.stringify(stored[SETTINGS_KEY] || {})) {
+    await chrome.storage.local.set({ [SETTINGS_KEY]: settings });
+  }
+  return settings;
 }
 
 async function saveSettings(nextSettings) {
@@ -144,4 +151,15 @@ function withTimeout(promise, timeoutMs) {
       setTimeout(() => reject(new Error("The AI request timed out.")), timeoutMs);
     })
   ]);
+}
+
+function migrateSettings(settings) {
+  const next = {
+    ...DEFAULT_SETTINGS,
+    ...(settings || {})
+  };
+  if (!next.serverUrl || next.serverUrl === LEGACY_LOCAL_SERVER_URL) {
+    next.serverUrl = DEFAULT_SETTINGS.serverUrl;
+  }
+  return next;
 }
