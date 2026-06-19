@@ -73,7 +73,11 @@ const SYSTEM_PROMPT = [
   "- If the answer is a date, time, ID, number, name, location, code, or another short answer that fits the question, do not expand it.",
   "- Grammar section: fix real typos, grammar, punctuation inside sentences, casing, and obvious sentence structure only. If no correction is needed, set keyword NO_TYPOS.",
   "- Do not create a grammar suggestion just to add a final period to a one-word answer, short fragment, name, code, number, date, or time.",
-  "- Improvement section: suggest a concise better business version only if the answer is too short for a prose question, too informal, unclear, too wordy, or not customer-ready.",
+  "- Improvement section: write the final replacement answer that can be sent to the customer. Never write advice, instructions, critique, or placeholders.",
+  "- If the answer contains slang, profanity, insults, or emotional wording, convert it into a professional mystery-shopper observation with the same meaning.",
+  "- Example: for an answer like 'Sie war kacke zu mir', the improved text should be like 'Die Mitarbeiterin war mir gegenueber sehr unfreundlich, wodurch die Situation unangenehm wirkte.'",
+  "- Never return text like 'Bitte sachlich formulieren', 'Bitte bearbeiten', 'Formulieren Sie...', 'Der Text sollte...', or 'Ich kann das nicht bewerten' as a suggestion.",
+  "- Suggest a concise better business version only if the answer is too short for a prose question, too informal, unclear, too wordy, or not customer-ready.",
   "- If the problem is too_short, rewrite the original answer as if you were the mystery shopper and explain the same observation in one or two additional concise sentences.",
   "- Too-short expansions must use only the original answer plus question context. Do not add new facts, guesses, causes, emotions, ratings, names, dates, prices, or details that are not implied by the text.",
   "- If you expand an answer, keep the meaning faithful to the original and avoid generic filler.",
@@ -266,9 +270,60 @@ function applyLocalReviewRules(review, fields) {
         };
       }
 
+      if (result.improvement?.status === "suggested" && isMetaEditingAdvice(result.improvement.text)) {
+        return {
+          ...result,
+          improvement: {
+            ...result.improvement,
+            label: result.improvement.label || "Formeller",
+            text: makeDirectReplacement(field)
+          },
+          notes: result.notes || "Meta-Hinweis wurde in eine direkte Ersatzformulierung umgewandelt."
+        };
+      }
+
       return result;
     })
   };
+}
+
+function isMetaEditingAdvice(value) {
+  const text = String(value || "").trim().toLocaleLowerCase("de-AT");
+  if (!text) {
+    return false;
+  }
+
+  return [
+    "bitte ",
+    "formulieren sie",
+    "der text sollte",
+    "die antwort sollte",
+    "sachlich formul",
+    "bearbeiten sie",
+    "ueberarbeiten sie",
+    "überarbeiten sie",
+    "ich kann",
+    "als ki"
+  ].some((pattern) => text.includes(pattern));
+}
+
+function makeDirectReplacement(field) {
+  const original = String(field.value || "").trim();
+  const lower = original.toLocaleLowerCase("de-AT");
+
+  if (/\bsie\b.*\b(kacke|scheisse|scheiße|beschissen|mies)\b.*\b(zu mir|mir gegenueber|mir gegenüber)\b/.test(lower)) {
+    return "Die Mitarbeiterin war mir gegenüber sehr unfreundlich, wodurch die Situation unangenehm wirkte.";
+  }
+
+  if (/\ber\b.*\b(kacke|scheisse|scheiße|beschissen|mies)\b.*\b(zu mir|mir gegenueber|mir gegenüber)\b/.test(lower)) {
+    return "Der Mitarbeiter war mir gegenüber sehr unfreundlich, wodurch die Situation unangenehm wirkte.";
+  }
+
+  if (/\b(kacke|scheisse|scheiße|beschissen|mies)\b/.test(lower)) {
+    return "Die Situation wirkte sehr unfreundlich und hinterließ keinen professionellen Eindruck.";
+  }
+
+  return original;
 }
 
 function isOnlyUnneededFinalPunctuation(originalValue, suggestionValue) {

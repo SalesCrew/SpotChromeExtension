@@ -75,4 +75,30 @@ const punctuationOnly = parseReviewPayload(JSON.stringify({
 }), [{ ...fields[0], value: "Ok" }]);
 
 assert.equal(punctuationOnly.results[0].grammar.keyword, "NO_TYPOS");
+
+const metaAdvice = parseReviewPayload(JSON.stringify({
+  results: [
+    {
+      fieldId: "spot-1-1-0",
+      grammar: {
+        status: "suggested",
+        keyword: "GRAMMAR_SUGGESTION",
+        text: "Sie war kacke zu mir."
+      },
+      improvement: {
+        status: "suggested",
+        keyword: "IMPROVEMENT_SUGGESTION",
+        problem: "too_informal",
+        label: "Formeller",
+        text: "Bitte bearbeiten Sie die Antwort sachlich."
+      },
+      notes: ""
+    }
+  ]
+}), [{ ...fields[0], value: "Sie war kacke zu mir" }]);
+
+assert.equal(
+  metaAdvice.results[0].improvement.text,
+  "Die Mitarbeiterin war mir gegenüber sehr unfreundlich, wodurch die Situation unangenehm wirkte."
+);
 console.log("Smoke test passed.");
