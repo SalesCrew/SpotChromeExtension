@@ -70,11 +70,12 @@
     }
 
     const panel = document.createElement("aside");
+    const version = chrome.runtime.getManifest?.().version || "";
     panel.id = "spot-ai-panel";
     panel.innerHTML = `
       <div class="spot-ai-panel-top">
         <div class="spot-ai-brand">
-          <p class="spot-ai-title">Textprüfung</p>
+          <p class="spot-ai-title">Textprüfung${version ? ` v${version}` : ""}</p>
           <p class="spot-ai-subtitle" data-role="field-count">Bereit</p>
         </div>
       </div>
