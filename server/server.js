@@ -114,6 +114,9 @@ function sanitizeFields(fields) {
     dimensionTitle: limit(String(field.dimensionTitle || ""), 300),
     sectionTitle: limit(String(field.sectionTitle || ""), 300),
     itemLabel: limit(String(field.itemLabel || ""), 500),
+    selectedOptions: Array.isArray(field.selectedOptions)
+      ? field.selectedOptions.map((option) => limit(String(option || ""), 220)).filter(Boolean).slice(0, 6)
+      : [],
     inputType: limit(String(field.inputType || "text"), 40),
     maxLength: Number(field.maxLength || -1),
     value: limit(String(field.value || ""), MAX_FIELD_CHARS)

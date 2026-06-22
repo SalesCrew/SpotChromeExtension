@@ -30,6 +30,17 @@ assert.equal(request.input.length, 2);
 assert.equal(request.text.format.type, "json_schema");
 assert.equal(request.text.format.schema.properties.results.type, "array");
 
+const contextualRequest = buildOpenAIRequest({
+  model: DEFAULT_MODEL,
+  page: { title: "Spot Test" },
+  fields: [{ ...fields[0], selectedOptions: ["dieses Szenario wurde nicht getestet"] }]
+});
+
+assert.deepEqual(
+  JSON.parse(contextualRequest.input[1].content).fields[0].selectedOptions,
+  ["dieses Szenario wurde nicht getestet"]
+);
+
 const parsed = parseReviewPayload(JSON.stringify({
   results: [
     {
@@ -156,5 +167,37 @@ const bareQuestionInstruction = parseReviewPayload(JSON.stringify({
 
 assert.equal(bareQuestionInstruction.results[0].improvement.text, "War super.");
 assert.equal(bareQuestionInstruction.results[0].improvement.label, "Verbessert");
+
+const notTestedReason = parseReviewPayload(JSON.stringify({
+  results: [
+    {
+      fieldId: "spot-1-1-0",
+      grammar: {
+        status: "suggested",
+        keyword: "GRAMMAR_SUGGESTION",
+        text: "War müde."
+      },
+      improvement: {
+        status: "suggested",
+        keyword: "IMPROVEMENT_SUGGESTION",
+        problem: "unclear",
+        label: "Antwort beantwortet die Frage nicht",
+        text: "Bitte notieren Sie, welches Produkt für dieses Testszenario verwendet wurde."
+      },
+      notes: "\"War müde\" passt nicht zum Szenario."
+    }
+  ]
+}), [{
+  ...fields[0],
+  question: "Szenario 3: Bitte notieren Sie im Kommentarfeld, welches Produkt für dieses Testszenario verwendet wurde:",
+  selectedOptions: ["dieses Szenario wurde nicht getestet"],
+  value: "War müde"
+}]);
+
+assert.equal(
+  notTestedReason.results[0].improvement.text,
+  "Aufgrund meiner Müdigkeit konnte ich dieses Szenario nicht mehr testen."
+);
+assert.equal(notTestedReason.results[0].improvement.label, "Verbessert");
 
 console.log("Smoke test passed.");

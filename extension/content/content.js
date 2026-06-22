@@ -249,6 +249,7 @@
     const itemId = row?.dataset?.item || element.name || element.id || index;
     const questionId = section?.dataset?.question || "question";
     const fieldId = `spot-${questionId}-${itemId}-${index}`;
+    const selectedOptions = collectSelectedOptions(row, section, element);
 
     return {
       fieldId,
@@ -257,6 +258,7 @@
       dimensionTitle,
       sectionTitle,
       itemLabel,
+      selectedOptions,
       inputType,
       maxLength: Number(element.getAttribute("maxlength") || -1),
       value,
@@ -273,6 +275,62 @@
       questionnaire: cleanText(document.querySelector(".property .property-value")?.textContent),
       page: cleanText(document.querySelector("article.interview > .PageSubroutine")?.textContent)
     };
+  }
+
+  function collectSelectedOptions(row, section, currentElement) {
+    const scopes = [row, section].filter(Boolean);
+    const selected = [];
+    const seen = new Set();
+
+    for (const scope of scopes) {
+      const controls = [...scope.querySelectorAll("input[type='checkbox']:checked, input[type='radio']:checked")];
+      for (const control of controls) {
+        if (control === currentElement) {
+          continue;
+        }
+        const label = cleanChoiceLabel(control);
+        const key = label.toLocaleLowerCase("de-AT");
+        if (label && !seen.has(key)) {
+          seen.add(key);
+          selected.push(label);
+        }
+      }
+      if (selected.length) {
+        break;
+      }
+    }
+
+    return selected.slice(0, 6);
+  }
+
+  function cleanChoiceLabel(control) {
+    const direct = cleanText(control.getAttribute("aria-label") || control.getAttribute("title"));
+    if (direct) {
+      return direct;
+    }
+
+    if (control.id) {
+      const explicitLabel = document.querySelector(`label[for="${cssEscape(control.id)}"]`);
+      const text = cleanText(explicitLabel?.textContent);
+      if (text) {
+        return text;
+      }
+    }
+
+    const label = control.closest("label");
+    const labelText = cleanText(label?.textContent);
+    if (labelText) {
+      return labelText;
+    }
+
+    const container = control.closest(".item-value, .answer, .option, .checkbox, .form-check, .td, td, li, div");
+    if (!container) {
+      return cleanText(control.value);
+    }
+
+    const clone = container.cloneNode(true);
+    clone.querySelectorAll("input, textarea, select, button, .spot-ai-card").forEach((node) => node.remove());
+    return cleanText(clone.textContent || control.value).slice(0, 180);
   }
 
   function needsAiReview(field) {
@@ -583,6 +641,11 @@
   }
 
   function replacementFromOriginal(field, result) {
+    const notTestedReason = makeNotTestedReasonReplacement(field);
+    if (notTestedReason) {
+      return notTestedReason;
+    }
+
     const grammarText = String(result?.grammar?.text || "").trim();
     if (
       result?.grammar?.status === "suggested" &&
@@ -592,6 +655,34 @@
       return grammarText;
     }
     return polishOriginalAnswer(field.value);
+  }
+
+  function makeNotTestedReasonReplacement(field) {
+    if (!hasNotTestedContext(field)) {
+      return "";
+    }
+
+    const text = normalizeForRules(field?.value);
+    if (/\b(mude|muede|muedigkeit|erschopft|fertig)\b/.test(text)) {
+      return "Aufgrund meiner Müdigkeit konnte ich dieses Szenario nicht mehr testen.";
+    }
+
+    if (/\b(keine zeit|zeitmangel|nicht geschafft|nicht mehr geschafft|zu lange|lange gedauert)\b/.test(text)) {
+      return "Aufgrund des langen Einsatzverlaufs konnte ich dieses Szenario nicht mehr testen.";
+    }
+
+    return "";
+  }
+
+  function hasNotTestedContext(field) {
+    const context = normalizeForRules([
+      field?.question,
+      field?.itemLabel,
+      field?.sectionTitle,
+      ...(Array.isArray(field?.selectedOptions) ? field.selectedOptions : [])
+    ].filter(Boolean).join(" "));
+
+    return /szenario/.test(context) && /(nicht getestet|wurde nicht getestet|nicht durchgefuehrt|nicht durchgefuhrt)/.test(context);
   }
 
   function polishOriginalAnswer(value) {
@@ -609,7 +700,7 @@
 
   function isInstructionLikeLabel(value) {
     const text = normalizeForRules(value);
-    return /(antwort passt nicht|falsch|unklar|inhalt|kommentarfeld|testszenario|szenario)/.test(text);
+    return /(antwort passt nicht|beantwortet|frage nicht|falsch|unklar|inhalt|kommentarfeld|testszenario|szenario)/.test(text);
   }
 
   function isInstructionLikeNote(value) {

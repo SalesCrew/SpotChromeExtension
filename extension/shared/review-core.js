@@ -71,6 +71,7 @@ const SYSTEM_PROMPT = [
   "For every field:",
   "- Treat the current answer as the only source text. Preserve its core meaning, sentiment, subject, negation, and facts 1:1.",
   "- Use the question context only to understand what the existing answer likely refers to. Never use the question text to create missing details.",
+  "- Selected options are part of the answer context. If a selected option says a scenario was not tested, rewrite a short reason in the answer as a professional reason for not testing that scenario.",
   "- If the answer does not contain the detail requested by the question, do not ask for it, do not mention that it is missing, and do not invent it.",
   "- If an answer cannot be improved while preserving the exact same content, set improvement.status to none.",
   "- Decide whether the answer is prose or a structured short answer.",
@@ -132,6 +133,9 @@ export function toModelField(field) {
     dimensionTitle: String(field.dimensionTitle || ""),
     sectionTitle: String(field.sectionTitle || ""),
     itemLabel: String(field.itemLabel || ""),
+    selectedOptions: Array.isArray(field.selectedOptions)
+      ? field.selectedOptions.map((option) => limitText(String(option || ""), 220)).filter(Boolean).slice(0, 6)
+      : [],
     inputType: String(field.inputType || "text"),
     maxLength: Number.isFinite(field.maxLength) ? field.maxLength : -1,
     answer: limitText(String(field.value || ""), 2200)
@@ -358,7 +362,7 @@ function cleanImprovementLabel(value) {
   if (
     !label ||
     isMetaEditingAdvice(label) ||
-    /(falsch|unklar|inhalt|passt nicht|kommentarfeld|testszenario)/.test(normalized)
+    /(falsch|unklar|inhalt|passt nicht|beantwortet|frage nicht|kommentarfeld|testszenario)/.test(normalized)
   ) {
     return "Verbessert";
   }
@@ -368,6 +372,10 @@ function cleanImprovementLabel(value) {
 function makeDirectReplacement(field, result) {
   const original = String(field.value || "").trim();
   const lower = original.toLocaleLowerCase("de-AT");
+  const notTestedReason = makeNotTestedReasonReplacement(field, original);
+  if (notTestedReason) {
+    return notTestedReason;
+  }
 
   if (/\bsie\b.*\b(kacke|scheisse|scheiße|beschissen|mies)\b.*\b(zu mir|mir gegenueber|mir gegenüber)\b/.test(lower)) {
     return "Die Mitarbeiterin war mir gegenüber sehr unfreundlich, wodurch die Situation unangenehm wirkte.";
@@ -392,6 +400,34 @@ function makeDirectReplacement(field, result) {
   }
 
   return polishOriginalAnswer(original);
+}
+
+function makeNotTestedReasonReplacement(field, original) {
+  if (!hasNotTestedContext(field)) {
+    return "";
+  }
+
+  const text = normalizeForRules(original);
+  if (/\b(mude|muede|muedigkeit|erschopft|fertig)\b/.test(text)) {
+    return "Aufgrund meiner Müdigkeit konnte ich dieses Szenario nicht mehr testen.";
+  }
+
+  if (/\b(keine zeit|zeitmangel|nicht geschafft|nicht mehr geschafft|zu lange|lange gedauert)\b/.test(text)) {
+    return "Aufgrund des langen Einsatzverlaufs konnte ich dieses Szenario nicht mehr testen.";
+  }
+
+  return "";
+}
+
+function hasNotTestedContext(field) {
+  const context = normalizeForRules([
+    field?.question,
+    field?.itemLabel,
+    field?.sectionTitle,
+    ...(Array.isArray(field?.selectedOptions) ? field.selectedOptions : [])
+  ].filter(Boolean).join(" "));
+
+  return /szenario/.test(context) && /(nicht getestet|wurde nicht getestet|nicht durchgefuehrt|nicht durchgefuhrt)/.test(context);
 }
 
 function isOnlyUnneededFinalPunctuation(originalValue, suggestionValue) {
