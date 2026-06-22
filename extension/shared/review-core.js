@@ -72,13 +72,18 @@ const SYSTEM_PROMPT = [
   "- Treat the current answer as the only source text. Preserve its core meaning, sentiment, subject, negation, and facts 1:1.",
   "- Use the question context only to understand what the existing answer likely refers to. Never use the question text to create missing details.",
   "- Selected options are part of the answer context. If a selected option says a scenario was not tested, rewrite a short reason in the answer as a professional reason for not testing that scenario.",
+  "- Customer-ready prose answers must normally be written in German Präteritum because the visit already happened.",
+  "- If a prose answer is in Präsens, Perfekt, or Futur, convert it to Präteritum while preserving the exact same content.",
+  "- Do not force Präteritum for dates, times, IDs, numbers, names, codes, product names, or other structured short answers.",
   "- If the answer does not contain the detail requested by the question, do not ask for it, do not mention that it is missing, and do not invent it.",
   "- If an answer cannot be improved while preserving the exact same content, set improvement.status to none.",
   "- Decide whether the answer is prose or a structured short answer.",
   "- If the answer is a date, time, ID, number, name, location, code, or another short answer that fits the question, do not expand it.",
   "- Grammar section: fix real typos, grammar, punctuation inside sentences, casing, and obvious sentence structure only. If no correction is needed, set keyword NO_TYPOS.",
+  "- Grammar section: if a prose answer is otherwise correct but not in Präteritum, return a grammar suggestion in Präteritum.",
   "- Do not create a grammar suggestion just to add a final period to a one-word answer, short fragment, name, code, number, date, or time.",
   "- Improvement section: write the final replacement answer that can be sent to the customer. Never write advice, instructions, critique, or placeholders.",
+  "- Improvement section: all prose replacement answers must be in Präteritum unless the answer is a structured short answer.",
   "- If the answer contains slang, profanity, insults, or emotional wording, convert it into a professional mystery-shopper observation with the same meaning.",
   "- Example: for an answer like 'Sie war kacke zu mir', the improved text should be like 'Die Mitarbeiterin war mir gegenueber sehr unfreundlich, wodurch die Situation unangenehm wirkte.'",
   "- Never return text like 'Bitte sachlich formulieren', 'Bitte bearbeiten', 'Bitte notieren...', 'Formulieren Sie...', 'Der Text sollte...', 'Die Antwort sollte...', or 'Ich kann das nicht bewerten' as a suggestion.",
@@ -283,7 +288,7 @@ function applyLocalReviewRules(review, fields) {
 
       if (next.improvement?.status === "suggested") {
         if (isMetaEditingAdvice(next.improvement.text) || isQuestionInstructionLeak(next.improvement.text, field)) {
-          return {
+          return applyPreteriteRules({
             ...next,
             improvement: {
               ...next.improvement,
@@ -291,13 +296,47 @@ function applyLocalReviewRules(review, fields) {
               text: makeDirectReplacement(field, next)
             },
             notes: ""
-          };
+          }, field);
         }
       }
 
-      return next;
+      return applyPreteriteRules(next, field);
     })
   };
+}
+
+function applyPreteriteRules(result, field) {
+  if (!shouldUsePreterite(field)) {
+    return result;
+  }
+
+  const next = {
+    ...result,
+    grammar: { ...(result?.grammar || {}) },
+    improvement: { ...(result?.improvement || {}) }
+  };
+
+  if (next.grammar?.status === "suggested" && next.grammar.text) {
+    next.grammar.text = toSimplePreterite(next.grammar.text);
+  }
+
+  if (next.improvement?.status === "suggested" && next.improvement.text) {
+    next.improvement.text = toSimplePreterite(next.improvement.text);
+  }
+
+  if (next.grammar?.status !== "suggested") {
+    const original = polishOriginalAnswer(field.value);
+    const preterite = toSimplePreterite(original);
+    if (preterite !== original) {
+      next.grammar = {
+        status: "suggested",
+        keyword: "GRAMMAR_SUGGESTION",
+        text: preterite
+      };
+    }
+  }
+
+  return next;
 }
 
 function isMetaEditingAdvice(value) {
@@ -464,6 +503,85 @@ function polishOriginalAnswer(value) {
 
   const first = original.charAt(0);
   const text = `${first.toLocaleUpperCase("de-AT")}${original.slice(1)}`;
+  if (countWords(text) > 1 && /[A-Za-z]/.test(text) && !/[.!?]$/.test(text)) {
+    return `${text}.`;
+  }
+  return text;
+}
+
+function shouldUsePreterite(field) {
+  const value = String(field?.value || "").trim();
+  if (!value || countWords(value) < 2) {
+    return false;
+  }
+
+  const inputType = String(field?.inputType || "text").toLowerCase();
+  if (["date", "time", "datetime-local", "number"].includes(inputType)) {
+    return false;
+  }
+
+  if (/^\d+([:.,/-]\d+)*$/.test(value) || /^[A-Z0-9_-]{2,}$/i.test(value)) {
+    return false;
+  }
+
+  return true;
+}
+
+function toSimplePreterite(value) {
+  let text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) {
+    return text;
+  }
+
+  const replacements = [
+    [/\bich bin\b/gi, "ich war"],
+    [/\bdu bist\b/gi, "du warst"],
+    [/\ber ist\b/gi, "er war"],
+    [/\bsie ist\b/gi, "sie war"],
+    [/\bes ist\b/gi, "es war"],
+    [/\bwir sind\b/gi, "wir waren"],
+    [/\bihr seid\b/gi, "ihr wart"],
+    [/\bsie sind\b/gi, "sie waren"],
+    [/\bich habe\b/gi, "ich hatte"],
+    [/\bdu hast\b/gi, "du hattest"],
+    [/\ber hat\b/gi, "er hatte"],
+    [/\bsie hat\b/gi, "sie hatte"],
+    [/\bes hat\b/gi, "es hatte"],
+    [/\bwir haben\b/gi, "wir hatten"],
+    [/\bihr habt\b/gi, "ihr hattet"],
+    [/\bsie haben\b/gi, "sie hatten"],
+    [/\bist\b/gi, "war"],
+    [/\bsind\b/gi, "waren"],
+    [/\bhat\b/gi, "hatte"],
+    [/\bhabe\b/gi, "hatte"],
+    [/\bhaben\b/gi, "hatten"],
+    [/\bwird\b/gi, "wurde"],
+    [/\bwerden\b/gi, "wurden"],
+    [/\bwirkt\b/gi, "wirkte"],
+    [/\bwirken\b/gi, "wirkten"],
+    [/\bgeht\b/gi, "ging"],
+    [/\bgehen\b/gi, "gingen"],
+    [/\bmacht\b/gi, "machte"],
+    [/\bmachen\b/gi, "machten"],
+    [/\bkommt\b/gi, "kam"],
+    [/\bkommen\b/gi, "kamen"],
+    [/\bsagt\b/gi, "sagte"],
+    [/\bsagen\b/gi, "sagten"],
+    [/\bfragt\b/gi, "fragte"],
+    [/\bfragen\b/gi, "fragten"],
+    [/\bzeigt\b/gi, "zeigte"],
+    [/\bzeigen\b/gi, "zeigten"],
+    [/\berkennt\b/gi, "erkannte"],
+    [/\berkennen\b/gi, "erkannten"],
+    [/\bkassieren\b/gi, "kassierten"],
+    [/\breagieren\b/gi, "reagierten"]
+  ];
+
+  for (const [pattern, replacement] of replacements) {
+    text = text.replace(pattern, replacement);
+  }
+
+  text = `${text.charAt(0).toLocaleUpperCase("de-AT")}${text.slice(1)}`;
   if (countWords(text) > 1 && /[A-Za-z]/.test(text) && !/[.!?]$/.test(text)) {
     return `${text}.`;
   }

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Spot Fragebogen Assistant",
   "description": "Reviews Spot questionnaire text answers and suggests concise customer-ready wording.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "action": {
     "default_title": "Spot Assistant",
     "default_popup": "popup/popup.html"

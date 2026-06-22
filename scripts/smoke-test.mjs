@@ -29,6 +29,7 @@ assert.equal(request.model, DEFAULT_MODEL);
 assert.equal(request.input.length, 2);
 assert.equal(request.text.format.type, "json_schema");
 assert.equal(request.text.format.schema.properties.results.type, "array");
+assert.match(request.input[0].content, /Präteritum/);
 
 const contextualRequest = buildOpenAIRequest({
   model: DEFAULT_MODEL,
@@ -63,6 +64,33 @@ const parsed = parseReviewPayload(JSON.stringify({
 }), fields);
 
 assert.equal(parsed.results[0].improvement.problem, "too_informal");
+
+const preteriteSuggestion = parseReviewPayload(JSON.stringify({
+  results: [
+    {
+      fieldId: "spot-1-1-0",
+      grammar: {
+        status: "clean",
+        keyword: "NO_TYPOS",
+        text: "Die Mitarbeiterin ist freundlich."
+      },
+      improvement: {
+        status: "suggested",
+        keyword: "IMPROVEMENT_SUGGESTION",
+        problem: "other",
+        label: "Verbessert",
+        text: "Die Mitarbeiterin ist freundlich und wirkt kompetent."
+      },
+      notes: ""
+    }
+  ]
+}), [{ ...fields[0], value: "Die Mitarbeiterin ist freundlich" }]);
+
+assert.equal(preteriteSuggestion.results[0].grammar.text, "Die Mitarbeiterin war freundlich.");
+assert.equal(
+  preteriteSuggestion.results[0].improvement.text,
+  "Die Mitarbeiterin war freundlich und wirkte kompetent."
+);
 
 const punctuationOnly = parseReviewPayload(JSON.stringify({
   results: [

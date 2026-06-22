@@ -638,7 +638,35 @@
       next.notes = "";
     }
 
+    applyPreteriteRulesForDisplay(next, field);
+
     return next;
+  }
+
+  function applyPreteriteRulesForDisplay(result, field) {
+    if (!shouldUsePreterite(field)) {
+      return;
+    }
+
+    if (result.grammar?.status === "suggested" && result.grammar.text) {
+      result.grammar.text = toSimplePreterite(result.grammar.text);
+    }
+
+    if (result.improvement?.status === "suggested" && result.improvement.text) {
+      result.improvement.text = toSimplePreterite(result.improvement.text);
+    }
+
+    if (result.grammar?.status !== "suggested") {
+      const original = polishOriginalAnswer(field.value);
+      const preterite = toSimplePreterite(original);
+      if (preterite !== original) {
+        result.grammar = {
+          status: "suggested",
+          keyword: "GRAMMAR_SUGGESTION",
+          text: preterite
+        };
+      }
+    }
   }
 
   function replacementFromOriginal(field, result) {
@@ -693,6 +721,85 @@
     }
 
     const text = `${original.charAt(0).toLocaleUpperCase("de-AT")}${original.slice(1)}`;
+    if (text.trim().split(/\s+/).filter(Boolean).length > 1 && /[A-Za-z]/.test(text) && !/[.!?]$/.test(text)) {
+      return `${text}.`;
+    }
+    return text;
+  }
+
+  function shouldUsePreterite(field) {
+    const value = String(field?.value || "").trim();
+    if (!value || value.trim().split(/\s+/).filter(Boolean).length < 2) {
+      return false;
+    }
+
+    const inputType = String(field?.inputType || "text").toLowerCase();
+    if (["date", "time", "datetime-local", "number"].includes(inputType)) {
+      return false;
+    }
+
+    if (/^\d+([:.,/-]\d+)*$/.test(value) || /^[A-Z0-9_-]{2,}$/i.test(value)) {
+      return false;
+    }
+
+    return true;
+  }
+
+  function toSimplePreterite(value) {
+    let text = String(value || "").replace(/\s+/g, " ").trim();
+    if (!text) {
+      return text;
+    }
+
+    const replacements = [
+      [/\bich bin\b/gi, "ich war"],
+      [/\bdu bist\b/gi, "du warst"],
+      [/\ber ist\b/gi, "er war"],
+      [/\bsie ist\b/gi, "sie war"],
+      [/\bes ist\b/gi, "es war"],
+      [/\bwir sind\b/gi, "wir waren"],
+      [/\bihr seid\b/gi, "ihr wart"],
+      [/\bsie sind\b/gi, "sie waren"],
+      [/\bich habe\b/gi, "ich hatte"],
+      [/\bdu hast\b/gi, "du hattest"],
+      [/\ber hat\b/gi, "er hatte"],
+      [/\bsie hat\b/gi, "sie hatte"],
+      [/\bes hat\b/gi, "es hatte"],
+      [/\bwir haben\b/gi, "wir hatten"],
+      [/\bihr habt\b/gi, "ihr hattet"],
+      [/\bsie haben\b/gi, "sie hatten"],
+      [/\bist\b/gi, "war"],
+      [/\bsind\b/gi, "waren"],
+      [/\bhat\b/gi, "hatte"],
+      [/\bhabe\b/gi, "hatte"],
+      [/\bhaben\b/gi, "hatten"],
+      [/\bwird\b/gi, "wurde"],
+      [/\bwerden\b/gi, "wurden"],
+      [/\bwirkt\b/gi, "wirkte"],
+      [/\bwirken\b/gi, "wirkten"],
+      [/\bgeht\b/gi, "ging"],
+      [/\bgehen\b/gi, "gingen"],
+      [/\bmacht\b/gi, "machte"],
+      [/\bmachen\b/gi, "machten"],
+      [/\bkommt\b/gi, "kam"],
+      [/\bkommen\b/gi, "kamen"],
+      [/\bsagt\b/gi, "sagte"],
+      [/\bsagen\b/gi, "sagten"],
+      [/\bfragt\b/gi, "fragte"],
+      [/\bfragen\b/gi, "fragten"],
+      [/\bzeigt\b/gi, "zeigte"],
+      [/\bzeigen\b/gi, "zeigten"],
+      [/\berkennt\b/gi, "erkannte"],
+      [/\berkennen\b/gi, "erkannten"],
+      [/\bkassieren\b/gi, "kassierten"],
+      [/\breagieren\b/gi, "reagierten"]
+    ];
+
+    for (const [pattern, replacement] of replacements) {
+      text = text.replace(pattern, replacement);
+    }
+
+    text = `${text.charAt(0).toLocaleUpperCase("de-AT")}${text.slice(1)}`;
     if (text.trim().split(/\s+/).filter(Boolean).length > 1 && /[A-Za-z]/.test(text) && !/[.!?]$/.test(text)) {
       return `${text}.`;
     }
