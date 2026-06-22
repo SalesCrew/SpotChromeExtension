@@ -352,13 +352,14 @@
       return;
     }
 
+    const safeResult = sanitizeResultForDisplay(field, result);
     const card = createCard(field);
-    card.appendChild(renderGrammarSection(field, result.grammar));
-    card.appendChild(renderImprovementSection(field, result.improvement));
-    if (result.notes) {
+    card.appendChild(renderGrammarSection(field, safeResult.grammar));
+    card.appendChild(renderImprovementSection(field, safeResult.improvement));
+    if (safeResult.notes) {
       const notes = document.createElement("p");
       notes.className = "spot-ai-copy spot-ai-muted";
-      notes.textContent = result.notes;
+      notes.textContent = safeResult.notes;
       card.appendChild(notes);
     }
     insertCard(element, card);
@@ -552,6 +553,185 @@
       none: "Nichts zu verbessern"
     };
     return labels[improvement?.problem] || "Verbessert";
+  }
+
+  function sanitizeResultForDisplay(field, result) {
+    const next = {
+      ...result,
+      grammar: { ...(result?.grammar || {}) },
+      improvement: { ...(result?.improvement || {}) },
+      notes: String(result?.notes || "")
+    };
+
+    if (next.improvement?.status === "suggested") {
+      const badText = isInstructionLikeText(next.improvement.text, field);
+      const badLabel = isInstructionLikeLabel(next.improvement.label);
+      if (badText || badLabel) {
+        next.improvement = {
+          ...next.improvement,
+          label: "Verbessert",
+          text: replacementFromOriginal(field, next)
+        };
+      }
+    }
+
+    if (isInstructionLikeText(next.notes, field) || isInstructionLikeNote(next.notes)) {
+      next.notes = "";
+    }
+
+    return next;
+  }
+
+  function replacementFromOriginal(field, result) {
+    const grammarText = String(result?.grammar?.text || "").trim();
+    if (
+      result?.grammar?.status === "suggested" &&
+      grammarText &&
+      !isInstructionLikeText(grammarText, field)
+    ) {
+      return grammarText;
+    }
+    return polishOriginalAnswer(field.value);
+  }
+
+  function polishOriginalAnswer(value) {
+    const original = String(value || "").replace(/\s+/g, " ").trim();
+    if (!original) {
+      return original;
+    }
+
+    const text = `${original.charAt(0).toLocaleUpperCase("de-AT")}${original.slice(1)}`;
+    if (text.trim().split(/\s+/).filter(Boolean).length > 1 && /[A-Za-z]/.test(text) && !/[.!?]$/.test(text)) {
+      return `${text}.`;
+    }
+    return text;
+  }
+
+  function isInstructionLikeLabel(value) {
+    const text = normalizeForRules(value);
+    return /(antwort passt nicht|falsch|unklar|inhalt|kommentarfeld|testszenario|szenario)/.test(text);
+  }
+
+  function isInstructionLikeNote(value) {
+    const text = normalizeForRules(value);
+    return /(beantwortet die frage nicht|keine produktangabe|kundengeeigneter inhalt|konkrete obst|konkrete gemuse|passt nicht)/.test(text);
+  }
+
+  function isInstructionLikeText(value, field) {
+    const text = normalizeForRules(value);
+    if (!text) {
+      return false;
+    }
+
+    const instructionPatterns = [
+      /\bbitte\b.*\b(notieren|beschreiben|angeben|kommentieren|erklaren|eintragen|nennen)\b/,
+      /\bnotieren\b.*\b(welche|welches|welcher|was|wie)\b/,
+      /\bwelche[rsn]?\b.*\b(produkt|sorte|obst|gemuse|fehler|etikett)\b/,
+      /\bprodukt\b.*\b(verwendet|angegeben|notiert)\b/,
+      /\bkommentarfeld\b/,
+      /\btestszenario\b/,
+      /\bantwort\b.*\b(passt nicht|sollte|muss|fehlt)\b/,
+      /\b(beantwortet|beantworte)\b.*\bfrage\b.*\bnicht\b/,
+      /\bkeine\b.*\b(produktangabe|angabe)\b/,
+      /\bgeforderten\b.*\b(kommentarfeld|frage|szenario)\b/
+    ];
+
+    if (instructionPatterns.some((pattern) => pattern.test(text))) {
+      return true;
+    }
+
+    const questionText = normalizeForRules([
+      field?.question,
+      field?.itemLabel,
+      field?.sectionTitle,
+      field?.dimensionTitle
+    ].filter(Boolean).join(" "));
+    const answerText = normalizeForRules(field?.value);
+
+    return isMostlyCopiedFromContext(text, questionText, answerText);
+  }
+
+  function isMostlyCopiedFromContext(suggestion, questionText, answerText) {
+    const suggestionTokens = meaningfulTokens(suggestion);
+    if (suggestionTokens.length < 5) {
+      return false;
+    }
+
+    const questionTokens = new Set(meaningfulTokens(questionText));
+    if (questionTokens.size < 5) {
+      return false;
+    }
+
+    const answerTokens = new Set(meaningfulTokens(answerText));
+    let contextMatches = 0;
+    let answerMatches = 0;
+
+    for (const token of suggestionTokens) {
+      if (questionTokens.has(token)) {
+        contextMatches += 1;
+      }
+      if (answerTokens.has(token)) {
+        answerMatches += 1;
+      }
+    }
+
+    return contextMatches >= 4 && contextMatches / suggestionTokens.length >= 0.55 && answerMatches <= 1;
+  }
+
+  function meaningfulTokens(value) {
+    const stopWords = new Set([
+      "aber",
+      "als",
+      "am",
+      "an",
+      "auch",
+      "auf",
+      "bei",
+      "das",
+      "den",
+      "der",
+      "des",
+      "die",
+      "dies",
+      "diese",
+      "diesem",
+      "diesen",
+      "dieser",
+      "dieses",
+      "ein",
+      "eine",
+      "einem",
+      "einen",
+      "einer",
+      "es",
+      "fuer",
+      "im",
+      "in",
+      "ist",
+      "mit",
+      "sie",
+      "und",
+      "war",
+      "wurde",
+      "zu",
+      "zum",
+      "zur"
+    ]);
+
+    return normalizeForRules(value)
+      .replace(/[^a-z0-9 ]/g, " ")
+      .split(/\s+/)
+      .filter((token) => token.length > 2 && !stopWords.has(token));
+  }
+
+  function normalizeForRules(value) {
+    return String(value || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/\u00df/g, "ss")
+      .replace(/\s+/g, " ")
+      .trim()
+      .toLocaleLowerCase("de-AT");
   }
 
   function cleanText(text) {
