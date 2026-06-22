@@ -91,7 +91,7 @@ async function callServer(settings, payload) {
       throw new Error(body.error || `Server request failed with ${response.status}.`);
     }
 
-    const normalized = normalizeReviewPayload(body.data || body);
+    const normalized = normalizeReviewPayload(body.data || body, payload.fields || []);
     return {
       ...normalized,
       model: body.model || body.data?.model || settings.model,

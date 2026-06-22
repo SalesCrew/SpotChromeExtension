@@ -101,4 +101,60 @@ assert.equal(
   metaAdvice.results[0].improvement.text,
   "Die Mitarbeiterin war mir gegenüber sehr unfreundlich, wodurch die Situation unangenehm wirkte."
 );
+const copiedQuestionInstruction = parseReviewPayload(JSON.stringify({
+  results: [
+    {
+      fieldId: "spot-1-1-0",
+      grammar: {
+        status: "suggested",
+        keyword: "GRAMMAR_SUGGESTION",
+        text: "War super."
+      },
+      improvement: {
+        status: "suggested",
+        keyword: "IMPROVEMENT_SUGGESTION",
+        problem: "unclear",
+        label: "Falscher/unklarer Inhalt",
+        text: "Bitte notieren Sie, welches Obst/Gemuese betroffen war und wie der Etikettierungsfehler korrekt erkannt und kassiert wurde."
+      },
+      notes: ""
+    }
+  ]
+}), [{
+  ...fields[0],
+  question: "Szenario 4: Die Kassakraft entdeckt den Fehler bei der Etikettierung des Obstes/Gemueses und kassiert dieses korrekt. - Kommentarfeld:",
+  value: "war super"
+}]);
+
+assert.equal(copiedQuestionInstruction.results[0].improvement.text, "War super.");
+assert.equal(copiedQuestionInstruction.results[0].improvement.label, "Verbessert");
+
+const bareQuestionInstruction = parseReviewPayload(JSON.stringify({
+  results: [
+    {
+      fieldId: "spot-1-1-0",
+      grammar: {
+        status: "clean",
+        keyword: "NO_TYPOS",
+        text: "war super"
+      },
+      improvement: {
+        status: "suggested",
+        keyword: "IMPROVEMENT_SUGGESTION",
+        problem: "unclear",
+        label: "Falscher/unklarer Inhalt",
+        text: "Welches Produkt bzw. welche unterschiedlichen Sorten fuer dieses Testszenario verwendet wurden."
+      },
+      notes: ""
+    }
+  ]
+}), [{
+  ...fields[0],
+  question: "Bitte notieren Sie im Kommentarfeld, welches Produkt bzw. welche unterschiedlichen Sorten fuer dieses Testszenario verwendet wurden:",
+  value: "war super"
+}]);
+
+assert.equal(bareQuestionInstruction.results[0].improvement.text, "War super.");
+assert.equal(bareQuestionInstruction.results[0].improvement.label, "Verbessert");
+
 console.log("Smoke test passed.");

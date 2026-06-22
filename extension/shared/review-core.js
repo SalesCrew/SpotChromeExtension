@@ -69,18 +69,23 @@ const SYSTEM_PROMPT = [
   "Your job is to make answers customer-ready without inventing facts.",
   "",
   "For every field:",
-  "- Use the question context to decide whether the answer is prose or a structured short answer.",
+  "- Treat the current answer as the only source text. Preserve its core meaning, sentiment, subject, negation, and facts 1:1.",
+  "- Use the question context only to understand what the existing answer likely refers to. Never use the question text to create missing details.",
+  "- If the answer does not contain the detail requested by the question, do not ask for it, do not mention that it is missing, and do not invent it.",
+  "- If an answer cannot be improved while preserving the exact same content, set improvement.status to none.",
+  "- Decide whether the answer is prose or a structured short answer.",
   "- If the answer is a date, time, ID, number, name, location, code, or another short answer that fits the question, do not expand it.",
   "- Grammar section: fix real typos, grammar, punctuation inside sentences, casing, and obvious sentence structure only. If no correction is needed, set keyword NO_TYPOS.",
   "- Do not create a grammar suggestion just to add a final period to a one-word answer, short fragment, name, code, number, date, or time.",
   "- Improvement section: write the final replacement answer that can be sent to the customer. Never write advice, instructions, critique, or placeholders.",
   "- If the answer contains slang, profanity, insults, or emotional wording, convert it into a professional mystery-shopper observation with the same meaning.",
   "- Example: for an answer like 'Sie war kacke zu mir', the improved text should be like 'Die Mitarbeiterin war mir gegenueber sehr unfreundlich, wodurch die Situation unangenehm wirkte.'",
-  "- Never return text like 'Bitte sachlich formulieren', 'Bitte bearbeiten', 'Formulieren Sie...', 'Der Text sollte...', or 'Ich kann das nicht bewerten' as a suggestion.",
-  "- Suggest a concise better business version only if the answer is too short for a prose question, too informal, unclear, too wordy, or not customer-ready.",
-  "- If the problem is too_short, rewrite the original answer as if you were the mystery shopper and explain the same observation in one or two additional concise sentences.",
-  "- Too-short expansions must use only the original answer plus question context. Do not add new facts, guesses, causes, emotions, ratings, names, dates, prices, or details that are not implied by the text.",
-  "- If you expand an answer, keep the meaning faithful to the original and avoid generic filler.",
+  "- Never return text like 'Bitte sachlich formulieren', 'Bitte bearbeiten', 'Bitte notieren...', 'Formulieren Sie...', 'Der Text sollte...', 'Die Antwort sollte...', or 'Ich kann das nicht bewerten' as a suggestion.",
+  "- Never copy the questionnaire instruction as the replacement answer.",
+  "- Suggest a concise better business version only if the answer is too informal, unclear, too wordy, or not customer-ready and can be rewritten without adding facts.",
+  "- If the problem is too_short, make the smallest professional rewrite of the original answer. Do not add extra observations, explanations, products, varieties, people, causes, emotions, ratings, names, dates, prices, or details.",
+  "- Keep the improved text close to the original length unless the original contains informal or abusive language that needs neutral wording.",
+  "- If you rewrite an answer, keep the meaning faithful to the original and avoid generic filler.",
   "- Keep the language of the original answer and question. Usually this is German.",
   "- Use a professional, neutral Austrian/German business tone.",
   "- Do not add filler, marketing language, unverifiable details, names, dates, prices, ratings, or claims not present in the original.",
@@ -99,7 +104,7 @@ export function buildOpenAIRequest({ model = DEFAULT_MODEL, page, fields }) {
         role: "user",
         content: JSON.stringify(
           {
-            task: "Review these Spot questionnaire answers.",
+            task: "Rewrite only each field's current answer text. The replacement must never be an instruction to the worker or copied questionnaire prompt text.",
             page,
             fields: fields.map(toModelField)
           },
@@ -258,9 +263,11 @@ function applyLocalReviewRules(review, fields) {
         return result;
       }
 
+      let next = result;
+
       if (isOnlyUnneededFinalPunctuation(field.value, result.grammar?.text)) {
-        return {
-          ...result,
+        next = {
+          ...next,
           grammar: {
             status: "clean",
             keyword: "NO_TYPOS",
@@ -270,25 +277,27 @@ function applyLocalReviewRules(review, fields) {
         };
       }
 
-      if (result.improvement?.status === "suggested" && isMetaEditingAdvice(result.improvement.text)) {
-        return {
-          ...result,
-          improvement: {
-            ...result.improvement,
-            label: result.improvement.label || "Formeller",
-            text: makeDirectReplacement(field)
-          },
-          notes: result.notes || "Meta-Hinweis wurde in eine direkte Ersatzformulierung umgewandelt."
-        };
+      if (next.improvement?.status === "suggested") {
+        if (isMetaEditingAdvice(next.improvement.text) || isQuestionInstructionLeak(next.improvement.text, field)) {
+          return {
+            ...next,
+            improvement: {
+              ...next.improvement,
+              label: cleanImprovementLabel(next.improvement.label),
+              text: makeDirectReplacement(field, next)
+            },
+            notes: ""
+          };
+        }
       }
 
-      return result;
+      return next;
     })
   };
 }
 
 function isMetaEditingAdvice(value) {
-  const text = String(value || "").trim().toLocaleLowerCase("de-AT");
+  const text = normalizeForRules(value);
   if (!text) {
     return false;
   }
@@ -301,13 +310,62 @@ function isMetaEditingAdvice(value) {
     "sachlich formul",
     "bearbeiten sie",
     "ueberarbeiten sie",
+    "uberarbeiten sie",
+    "notieren sie",
+    "geben sie",
+    "tragen sie",
     "überarbeiten sie",
     "ich kann",
     "als ki"
   ].some((pattern) => text.includes(pattern));
 }
 
-function makeDirectReplacement(field) {
+function isQuestionInstructionLeak(value, field) {
+  const text = normalizeForRules(value);
+  if (!text) {
+    return false;
+  }
+
+  const instructionPatterns = [
+    /\bbitte\b.*\b(notieren|beschreiben|angeben|kommentieren|erklaren)\b/,
+    /\bwelche[rsn]?\b.*\b(produkt|sorte|obst|gemuse|fehler|etikett)\b/,
+    /\bprodukt\b.*\bverwendet\b/,
+    /\bkommentarfeld\b/,
+    /\btestszenario\b/,
+    /\bantwort\b.*\bpasst nicht\b/,
+    /\bpasst nicht\b.*\b(kommentarfeld|szenario|frage)\b/,
+    /\bgeforderten\b.*\b(kommentarfeld|frage|szenario)\b/
+  ];
+
+  if (instructionPatterns.some((pattern) => pattern.test(text))) {
+    return true;
+  }
+
+  const questionText = normalizeForRules([
+    field?.question,
+    field?.itemLabel,
+    field?.sectionTitle,
+    field?.dimensionTitle
+  ].filter(Boolean).join(" "));
+  const answerText = normalizeForRules(field?.value);
+
+  return isMostlyCopiedFromContext(text, questionText, answerText);
+}
+
+function cleanImprovementLabel(value) {
+  const label = String(value || "").trim();
+  const normalized = normalizeForRules(label);
+  if (
+    !label ||
+    isMetaEditingAdvice(label) ||
+    /(falsch|unklar|inhalt|passt nicht|kommentarfeld|testszenario)/.test(normalized)
+  ) {
+    return "Verbessert";
+  }
+  return label;
+}
+
+function makeDirectReplacement(field, result) {
   const original = String(field.value || "").trim();
   const lower = original.toLocaleLowerCase("de-AT");
 
@@ -323,7 +381,17 @@ function makeDirectReplacement(field) {
     return "Die Situation wirkte sehr unfreundlich und hinterließ keinen professionellen Eindruck.";
   }
 
-  return original;
+  const grammarText = String(result?.grammar?.text || "").trim();
+  if (
+    result?.grammar?.status === "suggested" &&
+    grammarText &&
+    !isMetaEditingAdvice(grammarText) &&
+    !isQuestionInstructionLeak(grammarText, field)
+  ) {
+    return grammarText;
+  }
+
+  return polishOriginalAnswer(original);
 }
 
 function isOnlyUnneededFinalPunctuation(originalValue, suggestionValue) {
@@ -350,4 +418,101 @@ function normalizeShortAnswer(value) {
 
 function countWords(value) {
   return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function polishOriginalAnswer(value) {
+  const original = String(value || "").replace(/\s+/g, " ").trim();
+  if (!original) {
+    return original;
+  }
+
+  const first = original.charAt(0);
+  const text = `${first.toLocaleUpperCase("de-AT")}${original.slice(1)}`;
+  if (countWords(text) > 1 && /[A-Za-z]/.test(text) && !/[.!?]$/.test(text)) {
+    return `${text}.`;
+  }
+  return text;
+}
+
+function normalizeForRules(value) {
+  return String(value || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/\u00df/g, "ss")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLocaleLowerCase("de-AT");
+}
+
+function isMostlyCopiedFromContext(suggestion, questionText, answerText) {
+  const suggestionTokens = meaningfulTokens(suggestion);
+  if (suggestionTokens.length < 5) {
+    return false;
+  }
+
+  const questionTokens = new Set(meaningfulTokens(questionText));
+  if (questionTokens.size < 5) {
+    return false;
+  }
+
+  const answerTokens = new Set(meaningfulTokens(answerText));
+  let contextMatches = 0;
+  let answerMatches = 0;
+
+  for (const token of suggestionTokens) {
+    if (questionTokens.has(token)) {
+      contextMatches += 1;
+    }
+    if (answerTokens.has(token)) {
+      answerMatches += 1;
+    }
+  }
+
+  return contextMatches >= 4 && contextMatches / suggestionTokens.length >= 0.55 && answerMatches <= 1;
+}
+
+function meaningfulTokens(value) {
+  const stopWords = new Set([
+    "aber",
+    "als",
+    "am",
+    "an",
+    "auch",
+    "auf",
+    "bei",
+    "das",
+    "den",
+    "der",
+    "des",
+    "die",
+    "dies",
+    "diese",
+    "diesem",
+    "diesen",
+    "dieser",
+    "dieses",
+    "ein",
+    "eine",
+    "einem",
+    "einen",
+    "einer",
+    "es",
+    "fuer",
+    "im",
+    "in",
+    "ist",
+    "mit",
+    "sie",
+    "und",
+    "war",
+    "wurde",
+    "zu",
+    "zum",
+    "zur"
+  ]);
+
+  return normalizeForRules(value)
+    .replace(/[^a-z0-9 ]/g, " ")
+    .split(/\s+/)
+    .filter((token) => token.length > 2 && !stopWords.has(token));
 }
